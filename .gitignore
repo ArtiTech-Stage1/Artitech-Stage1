@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv_artitech/
+venv/
+env/
+ENV/
+
+# PyTorch Models (large files)
+# Keep model structure but exclude large weight files if needed
+# models/pidinet/*.pth
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Obsidian
+.obsidian/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Output files (can be regenerated)
+outputs/*.jpg
+outputs/*.png
+!outputs/.gitkeep
+
+# External repositories (if they contain large files)
+# external/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json 
