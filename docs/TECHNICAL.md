@@ -3,7 +3,7 @@
 
 ## 🏗️ **System Architecture**
 
-### Current Implementation
+### Current Implementation - **UPDATED with Saliency Integration**
 ```
 Input Artwork
      ↓
@@ -13,11 +13,19 @@ PiDiNet Model (PyTorch)
      ↓
 Edge Probability Map
      ↓
-Threshold Application
+DDN Model Enhancement (Phase 2)
      ↓
-Post-processing
+Hybrid Fusion (PiDiNet + DDN)
      ↓
-Output Edge Map
+Full Outline Map
+     ↓
+ConceptAttention Saliency Analysis ✨ NEW
+     ↓
+Emotion-based Masking
+     ↓
+Partial Outline Generation
+     ↓
+Output Edge Map (with Hidden Emotional Regions)
 ```
 
 ### Component Status
@@ -29,6 +37,8 @@ Output Edge Map
 | **Multi-Device** | ✅ Complete | CPU/CUDA/MPS support | Optimized |
 | **DDN Model** | 🟡 Planned | Phase 2 implementation | TBD |
 | **Hybrid Fusion** | 🟡 Planned | Phase 3 implementation | TBD |
+| **ConceptAttention** | 🟡 **NEW - Planned** | **Saliency-guided masking** | **~200ms CUDA** |
+| **Emotion Mapping** | 🟡 **NEW - Planned** | **Therapeutic interaction** | **Real-time** |
 
 ## 🧠 **PiDiNet Model Architecture**
 
@@ -74,103 +84,111 @@ VARIANTS = {
    - Feature aggregation and dimensionality reduction
    - Efficient processing of multi-scale features
 
+## 🎯 **ConceptAttention Saliency Integration** ✨ **NEW**
+
+### Saliency-Guided Pipeline
+The ConceptAttention module enables **emotion-adaptive partial outline generation** for therapeutic art interaction:
+
+```python
+# Saliency Integration Pipeline
+class SaliencyGuidedPipeline:
+    """
+    Emotion-based partial outline generation using ConceptAttention
+    """
+    def __init__(self, concept_attention_model, emotion_prompt_map):
+        self.saliency_model = concept_attention_model
+        self.emotion_prompts = emotion_prompt_map
+        
+    def generate_partial_outline(self, image, emotion, full_outline):
+        # 1. Generate saliency map based on emotion
+        prompt = self.emotion_prompts.get(emotion, "face")
+        saliency_map = self.saliency_model.get_saliency_map(image, prompt)
+        
+        # 2. Create emotion mask (hide salient regions)
+        emotion_mask = self._create_emotion_mask(saliency_map)
+        
+        # 3. Apply mask to outline (remove emotional regions)
+        partial_outline = full_outline * (1 - emotion_mask)
+        
+        return partial_outline, emotion_mask
+```
+
+### Key Saliency Components
+
+1. **ConceptAttention Model**
+   - Zero-shot concept-based saliency detection
+   - Diffusion Image Transformer (DiT) backbone
+   - Emotion-guided attention mapping
+
+2. **Emotion Prompt System**
+   - Dynamic prompt selection based on user emotion
+   - Semantic concept mapping (face, gesture, eyes, etc.)
+   - Therapeutic context awareness
+
+3. **Adaptive Masking**
+   - Threshold-based saliency conversion
+   - Emotion-specific masking strategies
+   - User creativity encouragement through strategic hiding
+
+4. **Partial Outline Generation**
+   - Selective edge removal from complete outline
+   - Emotion-region identification and masking
+   - SVG-compatible output for interactive drawing
+
+### Emotion-to-Concept Mapping
+```python
+EMOTION_CONCEPT_MAP = {
+    "sadness": ["face", "figure", "eyes"],
+    "joy": ["sun", "sky", "flowers"],
+    "anxiety": ["hand", "gesture", "body"],
+    "loneliness": ["window", "silhouette", "distance"],
+    "anger": ["mouth", "expression", "tension"],
+    "fear": ["shadow", "background", "isolation"]
+}
+```
+
 ## 💻 **Implementation Details**
 
-### File Structure
+### File Structure - **UPDATED**
 ```
 src/
 ├── edge_detection/
 │   ├── pidinet_model.py      # Main PiDiNet implementation
 │   ├── ddn_model.py          # DDN model (placeholder)
 │   ├── fusion.py             # Hybrid fusion logic
+│   ├── saliency_model.py     # ✨ NEW: ConceptAttention integration
+│   ├── emotion_mapper.py     # ✨ NEW: Emotion-to-concept mapping
 │   └── converter.py          # ONNX conversion utilities
 ├── config/
-│   ├── system_defaults.py    # Production configuration
+│   ├── system_defaults.py    # Production configuration + saliency params
+│   ├── emotion_presets.py    # ✨ NEW: Emotion-based configurations
 │   └── __init__.py           # Configuration interface
 └── cli/
-    └── edge_infer.py         # Command-line interface
+    └── edge_infer.py         # Command-line interface + saliency options
 ```
 
-### Core Classes
+### Core Classes - **EXTENDED**
 ```python
-class PiDiNetModel:
-    """Main PiDiNet model wrapper"""
-    def __init__(self, model_path, device, model_variant)
-    def predict(self, image, threshold)
-    def benchmark(self, image, num_runs)
+class SaliencyModel:
+    """ConceptAttention wrapper for emotion-based saliency"""
+    def __init__(self, model_path, device, emotion_threshold=0.4)
+    def get_emotion_saliency(self, image, emotion)
+    def create_therapy_mask(self, saliency_map, mask_strategy)
 
-class PiDiNet(nn.Module):
-    """PyTorch PiDiNet architecture"""
-    def __init__(self, inplane, pdcs, dil, sa, convert)
-    def forward(self, x)
+class EmotionMapper:
+    """Maps user emotions to visual concepts for saliency guidance"""
+    def __init__(self, concept_map_path)
+    def get_concepts_for_emotion(self, emotion)
+    def get_adaptive_threshold(self, emotion, image_complexity)
 
-class PDCBlock(nn.Module):
-    """Pixel Difference Convolution block"""
-    def __init__(self, pdc, inplane, ouplane, stride)
-    def forward(self, x)
+class PartialOutlineGenerator:
+    """Generates therapeutic partial outlines from complete edge maps"""
+    def __init__(self, saliency_model, edge_fusion)
+    def generate_partial_outline(self, image, emotion, full_outline)
+    def save_interactive_svg(self, partial_outline, output_path)
 ```
 
-## 🔧 **Device Optimization**
-
-### Apple Silicon (MPS)
-```python
-# MPS optimization
-if torch.backends.mps.is_available():
-    device = torch.device("mps")
-    # Optimized for M1/M2/M3/M4 chips
-    # Unified memory architecture
-    # Metal Performance Shaders acceleration
-```
-
-### NVIDIA GPU (CUDA)
-```python
-# CUDA optimization
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-    # GPU memory management
-    # CUDA kernel optimization
-    # Tensor core utilization
-```
-
-### CPU Fallback
-```python
-# CPU optimization
-device = torch.device("cpu")
-# Multi-threading support
-# SIMD instruction utilization
-# Memory-efficient processing
-```
-
-## 📊 **Performance Characteristics**
-
-### Memory Usage Patterns
-```python
-# Memory allocation by component
-MODEL_MEMORY = {
-    "weights": "200-800MB",      # Model parameters
-    "activations": "500-1200MB", # Forward pass tensors
-    "gradients": "0MB",          # Inference only
-    "overhead": "100-200MB"      # PyTorch overhead
-}
-```
-
-### Processing Pipeline
-```python
-def processing_pipeline(image):
-    # 1. Preprocessing (5-10ms)
-    tensor = preprocess(image)
-    
-    # 2. Model inference (15-500ms)
-    with torch.no_grad():
-        output = model(tensor)
-    
-    # 3. Post-processing (5-15ms)
-    edge_map = postprocess(output, threshold)
-    
-    return edge_map
-```
-
-## 🚀 **Future Architecture (Planned)**
+## 🚀 **Future Architecture (Updated)**
 
 ### Phase 2: DDN Integration
 ```
@@ -178,81 +196,88 @@ PiDiNet (Client) → Edge Map → ROI Detection
                                     ↓
 DDN (Server) ← Complex Regions ← Tile Extraction
      ↓
-Enhanced Edges → Fusion → Final Output
+Enhanced Edges → Fusion → Full Outline
 ```
 
-### Phase 3: Hybrid Fusion
-```python
-class EdgeFusion:
-    """Hybrid PiDiNet + DDN fusion"""
-    def __init__(self, pidinet_model, ddn_model)
-    def fuse_edges(self, pidinet_output, ddn_output, alpha=0.7)
-    def adaptive_fusion(self, image, complexity_threshold)
+### Phase 3: **Saliency-Guided Therapeutic Pipeline** ✨ **NEW**
+```
+Full Outline → ConceptAttention → Emotion Saliency Map
+                    ↓                      ↓
+            User Emotion Input → Concept Mapping → Adaptive Masking
+                                     ↓
+                            Partial Outline → Interactive SVG
+                                     ↓
+                            Therapeutic Drawing Experience
 ```
 
-### Phase 4: ONNX Optimization
+### Phase 4: Hybrid Fusion + Emotion Integration
 ```python
-# ONNX conversion pipeline
-torch_model → ONNX → Optimization → Quantization → Deployment
-    ↓           ↓         ↓            ↓           ↓
-  PyTorch    ONNX     Graph Opt    INT8/FP16   Mobile/Web
+class TherapeuticEdgeFusion:
+    """Enhanced fusion with emotion-aware processing"""
+    def __init__(self, pidinet_model, ddn_model, saliency_model)
+    def fuse_edges_with_emotion(self, pidinet_output, ddn_output, 
+                               emotion, alpha=0.7, saliency_weight=0.3)
+    def adaptive_therapeutic_fusion(self, image, emotion, complexity_threshold)
 ```
 
-## 🔬 **Technical Specifications**
-
-### Model Parameters
-| Variant | Parameters | Model Size | FLOPS | Memory |
-|---------|------------|------------|-------|--------|
-| **Tiny** | ~2.1M | 8.5MB | 1.2G | 1GB |
-| **Small** | ~3.8M | 15.2MB | 2.1G | 1.5GB |
-| **Standard** | ~8.9M | 35.6MB | 4.8G | 2GB |
-
-### Input/Output Specifications
+### Phase 5: ONNX Optimization + Mobile Saliency
 ```python
-INPUT_SPEC = {
-    "format": "RGB image",
-    "dtype": "uint8 or float32",
-    "range": "0-255 or 0.0-1.0",
-    "channels": 3,
-    "resolution": "Variable (tested up to 4000x3000)"
+# Extended ONNX pipeline with saliency
+torch_model → ONNX → Optimization → Quantization → Mobile Deployment
+    ↓           ↓         ↓            ↓              ↓
+  PyTorch    ONNX     Graph Opt    INT8/FP16    Mobile+Saliency
+```
+
+## 🔬 **Technical Specifications - UPDATED**
+
+### Saliency Model Parameters ✨ **NEW**
+| Component | Parameters | Model Size | Processing Time | Memory |
+|-----------|------------|------------|-----------------|--------|
+| **ConceptAttention** | ~85M | 340MB | 150-250ms | 2.5GB |
+| **Emotion Mapper** | Config-based | <1MB | <5ms | 50MB |
+| **Mask Generator** | Algorithmic | - | 10-20ms | 100MB |
+
+### Input/Output Specifications - EXTENDED
+```python
+SALIENCY_INPUT_SPEC = {
+    "image_format": "RGB image (same as edge detection)",
+    "emotion_input": "string (sadness, joy, anxiety, etc.)",
+    "concept_prompt": "string (auto-generated from emotion)",
+    "threshold": "0.3-0.5 (emotion-adaptive)"
 }
 
-OUTPUT_SPEC = {
-    "format": "Grayscale edge map", 
-    "dtype": "uint8",
-    "range": "0-255",
-    "channels": 1,
-    "resolution": "Same as input"
+SALIENCY_OUTPUT_SPEC = {
+    "saliency_map": "float32 [0.0, 1.0]",
+    "emotion_mask": "uint8 binary mask", 
+    "partial_outline": "uint8 edge map with hidden regions",
+    "interactive_svg": "SVG with dashed/hidden sections"
 }
 ```
 
-## 🛠️ **Development Workflow**
+## 🛠️ **Development Workflow - UPDATED**
 
-### Model Development
+### Saliency Model Development ✨ **NEW**
 ```bash
-# 1. Model architecture changes
-vim src/edge_detection/pidinet_model.py
+# 1. Saliency integration testing
+python -m src.cli.edge_infer --input test.jpg --emotion sadness --enable-saliency
 
-# 2. Test changes
-python -m src.cli.edge_infer --input test.jpg --verbose
+# 2. Emotion mapping validation
+python -m src.cli.edge_infer --input test.jpg --emotion joy --concept-override "sun"
 
-# 3. Benchmark performance
-python -m src.cli.edge_infer --input test.jpg --benchmark --num-runs 50
+# 3. Therapeutic outline generation
+python -m src.cli.edge_infer --input test.jpg --emotion anxiety --output-format svg
 
-# 4. Validate on diverse artworks
-python -m src.cli.edge_infer --input images/*.jpg --benchmark
+# 4. Benchmark saliency performance
+python -m src.cli.edge_infer --input test.jpg --emotion sadness --benchmark --verbose
 ```
 
-### Configuration Updates
+### Emotion Configuration Testing
 ```bash
-# 1. Update defaults
-vim src/config/system_defaults.py
+# 1. Test emotion presets
+python -c "from src.config.emotion_presets import validate_emotion_config; validate_emotion_config()"
 
-# 2. Validate configuration
-python -c "from src.config import validate_config, get_default_config; print(validate_config(get_default_config()))"
-
-# 3. Test with new defaults
-python -m src.cli.edge_infer --input test.jpg
+# 2. Validate concept mappings
+python -c "from src.edge_detection.emotion_mapper import EmotionMapper; mapper = EmotionMapper(); print(mapper.get_concepts_for_emotion('sadness'))"
 ```
 
 ## 📈 **Optimization Roadmap**
