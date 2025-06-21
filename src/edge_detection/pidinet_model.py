@@ -656,18 +656,25 @@ class PiDiNetModel:
             Edge map as numpy array (H, W) with values in [0, 255]
         """
         # Convert to numpy and remove batch dimension
+        # Step 1: Tensor → NumPy 변환 (GPU → CPU)
         edge_map = output.squeeze().cpu().numpy()
+        # 🔄 torch.Tensor [1,1,H,W] → np.ndarray [H,W]
+        # 🔄 GPU/MPS memory → CPU memory
 
         # Resize to original shape
+        # Step 2: 크기 조정
         if edge_map.shape != original_shape:
             edge_map = cv2.resize(
                 edge_map,
                 (original_shape[1], original_shape[0]),
                 interpolation=cv2.INTER_LINEAR,
             )
+            # 🔄 모델 입력 크기 → 원본 이미지 크기
 
         # Convert to uint8
+        # Step 3: 데이터 타입 변환
         edge_map = (edge_map * 255).astype(np.uint8)
+        # 🔄 float32 [0.0, 1.0] → uint8 [0, 255]
 
         return edge_map
 
@@ -692,6 +699,12 @@ class PiDiNetModel:
         # Inference
         with torch.no_grad():
             output = self.model(input_tensor)
+            # output 특성:
+            # - Type: torch.Tensor
+            # - Shape: [1, 1, H, W]  (배치=1, 채널=1, 높이, 너비)
+            # - Device: cuda/mps/cpu
+            # - Dtype: torch.float32
+            # - Value range: [0.0, 1.0] (sigmoid 활성화 후)
 
             # Handle different output formats
             if isinstance(output, list):

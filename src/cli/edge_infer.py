@@ -144,6 +144,16 @@ def main(
         sys.exit(1)
 
 
+"""
+# Initialize the specified edge detection model
+# model: str - The name of the model to initialize
+# variant: str - The variant of the model to use
+# device: str - The device to use for inference
+# verbose: bool - Whether to print verbose output
+# Returns: The initialized model
+"""
+
+
 def _initialize_model(model: str, variant: str, device: str, verbose: bool):
     """Initialize the specified edge detection model"""
 
@@ -157,6 +167,18 @@ def _initialize_model(model: str, variant: str, device: str, verbose: bool):
         click.echo(f"🔧 Initializing {model.upper()} model...")
         click.echo(f"📁 Model weights: {model_path}")
         click.echo(f"💻 Device: {device}")
+
+    """
+    pidinet model architecture is from src/edge_detection/pidinet_model.py
+    
+    PidiNetModel instance is created with the following parameters:
+    model_path: str - The path to the model weights
+    device: str - The device to use for inference
+    use_converted: bool - Whether to use the converted model
+    use_sa: bool - Whether to use spatial attention
+    use_dil: bool - Whether to use dilated convolutions
+    model_variant: str - The variant of the model to use
+    """
 
     if model.lower() == "pidinet":
         return PiDiNetModel(
