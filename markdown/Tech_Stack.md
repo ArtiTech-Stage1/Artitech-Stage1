@@ -1,297 +1,465 @@
-_Outline‑to‑Sketch Engine – Technical Specification + Saliency Integration_
+# Technology Stack
+**ArtiTech Stage 1 - PiDiNet + DDN Edge Detection Pipeline**
 
----
+## 🏗️ **Architecture Overview**
 
-## 0. Quick‑Glance Layer Map - **UPDATED**
+### ✅ **Current Implementation - Production Edge Detection**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ARTITECH STAGE 1                        │
+│                 Edge Detection Pipeline                     │
+└─────────────────────────────────────────────────────────────┘
 
-```mermaid
-flowchart TD
-  A[User Device - Web or Mobile] -->|REST or WS| B[FastAPI Gateway]
-  B --> C[Image Task Worker]
-  C -->|publish| D[Redis Queue]
-  C -->|weights| E[Torch Model Store]
-  C -->|saliency| F[ConceptAttention Service ✨ NEW]
-  C -->|upload| G[S3 Art Assets]
-  B --> H[Postgres]
-  H --> I[User Auth and Prefs]
-  H --> J[Emotion Profiles ✨ NEW]
-  C --> K[ONNX Node Pool]
-  F --> L[Emotion Mapping Cache ✨ NEW]
+📱 Client Layer (✅ Implemented)
+├── 🖥️ CLI Interface (src/cli/edge_infer.py)
+├── 📊 Performance Benchmarking
+├── 🔧 Configuration Management
+└── 📁 Multi-format Output (JPEG/PNG/BMP)
+
+🧠 Processing Layer (✅ Implemented)  
+├── 🎨 PiDiNet Model (PyTorch)
+│   ├── Tiny Variant (20 channels)
+│   ├── Small Variant (30 channels)
+│   └── Standard Variant (60 channels)
+├── 🔗 DDN Model Architecture (ready)
+├── ⚡ Edge Fusion Algorithms
+└── 🎯 ONNX Conversion Pipeline
+
+💻 Device Layer (✅ Implemented)
+├── 🍎 Apple Silicon (MPS optimization)
+├── 🟢 NVIDIA CUDA (GPU acceleration) 
+├── 🔵 Intel/AMD CPU (fallback)
+└── 📱 Multi-platform Support
 ```
 
-
----
-
-## 1. Model Training & Experimentation - **UPDATED**
-
-|Component|Stack Choice|Version|Notes|
-|---|---|---|---|
-|**Language & Runtime**|Python|3.11|`pyenv`‑pinned, 3.12 blocked until Torch 2.3 LTS|
-|**Deep Learning Framework**|PyTorch|2.2 + CUDA 12.3|enable `torch.compile`, Mamba kernels, **ConceptAttention support** ✨|
-|**Saliency Framework** ✨ **NEW**|**ConceptAttention**|**latest**|**DiT backbone, emotion-concept mapping, 150-250ms processing** ✨|
-|**Experiment Tracking**|Weights & Biases|SaaS|sweep yaml templates in repo `configs/`, **emotion accuracy tracking** ✨|
-|**Data Versioning**|DVC|3.x|S3 remote, pipeline stage cache, **emotion-labeled datasets** ✨|
-|**Notebook IDE**|JupyterLab + VS Code|latest|GPU dev‑container (`.devcontainer.json`), **saliency experimentation** ✨|
-
-### Hardware Targets - **UPDATED**
-
-- **Research GPU** – RTX 4090 / A100 (**required for ConceptAttention training** ✨)
-
-- **Production Server** – NVIDIA GPU with 8GB+ VRAM (**for saliency processing** ✨)
-
-- **Mobile/Tablet Perf** – Tablets with CoreML optimization (**for basic emotion detection** ✨).
-    
-
----
-
-## 2. Edge Detection Module - **UPDATED**
-
-| Item                 | Base                          | Deployment Variant | Optimisation                          |
-| -------------------- | ----------------------------- | ------------------ | ------------------------------------- |
-| **PiDiNet**          | Huaijin Pi et al. (ECCV 2020) | ONNX-INT8          | quantized + edge-preserving tiling    |
-| **ConceptAttention** ✨ **NEW** | **DiT-based saliency** | **ONNX-FP16** | **emotion-guided concept detection** ✨ |
-| **Threshold Fusion** | OpenCV                        | WASM               | `cv.threshold + cv.bitwise_or` 2-pass |
-| **Emotion Mapping** ✨ **NEW** | **Custom logic** | **Python** | **fast concept-to-prompt translation** ✨ |
-
-> **Latency Goal:** `≤ 50 ms` @ 512² on Mac M4 CPU (single thread) for baseline PiDiNet + `≤ 250ms` **for saliency processing** ✨.
-
----
-
-## 3. Raster‑to‑Vector & Stylisation Backend - **UPDATED**
-
-| Function                     | Library                      | Version                         | Rationale                                   |
-| ---------------------------- | ---------------------------- | ------------------------------- | ------------------------------------------- |
-| **Vectoriser (Low‑latency)** | Potrace C lib + `py_potrace` | 1.16                            | Stateless, <100 ms/1 K² PNG                 |
-| **Vector Refiner**           | DiffVG                       | nightly (2025-05)               | Torch 2 compatible, `loss="mamba"` sub-iter |
-| **Saliency Processor** ✨ **NEW** | **ConceptAttention** | **latest** | **emotion-based region detection** ✨ |
-| **Emotion Masker** ✨ **NEW** | **Custom NumPy** | **latest** | **therapeutic outline generation** ✨ |
-| **Bézier Splatting (R&D)**   | arXiv 2503.16424             | prototype                       | for >2 K px poster exports                  |
-| **Sketch Shader**            | Custom GLSL Cross‑Hatch      | MIT repo `spite/cross‑hatching` | WebGL & Metal parallel                      |
-| **Color/Tone**               | OpenCV LUT                   | 4.10                            | Sepia & Graphite presets in YAML            |
-
----
-
-## 4. Runtime Back‑End Services - **UPDATED**
-
-| Service            | Tooling              | Deployment                       |
-| ------------------ | -------------------- | -------------------------------- |
-| **API Gateway**    | FastAPI + Uvicorn    | Docker → K8s (k3s)               |
-| **Async Queue**    | Redis 6              | `rq` workers auto-scale via KEDA |
-| **Task Workers**   | Python 3.11          | GPU/CPU node pools (taints)      |
-| **Saliency Service** ✨ **NEW** | **Python + ConceptAttention** | **GPU-optimized pods** ✨ |
-| **Emotion Cache** ✨ **NEW** | **Redis + Custom logic** | **Fast concept lookup** ✨ |
-| **Static Storage** | MinIO (S3)           | artefact & SVG bucket            |
-| **Monitoring**     | Prometheus + Grafana | Helm stack                       |
-
-Security essentials: `opa-envoy` policy sidecar, JWT (Supabase) auth at gateway, **emotion data protection** ✨.
-
----
-
-## 5. Front‑End / Web UI - **UPDATED**
-
-| Layer                | Tech                    | Notes                          |
-| -------------------- | ----------------------- | ------------------------------ |
-| **Framework**        | React 18 + TypeScript 5 | Vite build, ESLint + Prettier  |
-| **Canvas**           | Fabric.js 6             | path editing, dash live toggle |
-| **Emotion Interface** ✨ **NEW** | **Custom React components** | **emotion selection, intensity sliders** ✨ |
-| **Therapeutic Progress** ✨ **NEW** | **React hooks + local storage** | **completion tracking, emotional feedback** ✨ |
-| **3‑D / WebGL**      | Three.js                | future ink-flow anims          |
-| **State**            | Zustand                 | lightweight store              |
-| **Styling**          | Tailwind CSS 3          | dark/light tokens              |
-| **SVG Manipulation** | `svg.js`                | import/export helpers          |
-
-Accessibility: ARIA roles on trace-canvas, keyboard shortcuts, colour-blind palettes, **emotion accessibility** ✨.
-
----
-
-## 6. Mobile Apps - **UPDATED**
-
-| Item                | Stack                      | Build                          |
-| ------------------- | -------------------------- | ------------------------------ |
-| **Shared Codebase** | React-Native + Expo SDK 51 | EAS build pipelines            |
-| **Edge Inference**  | CoreML PiDiNet             | Apple Neural Engine            |
-| **Saliency Inference** ✨ **NEW** | **CoreML ConceptAttention** | **Apple Neural Engine + GPU** ✨ |
-| **Emotion Processing** ✨ **NEW** | **On-device logic** | **Fast concept mapping** ✨ |
-|                     | ONNX-Runtime-Mobile        | Android NNAPI ‑ FP16           |
-| **CI**              | GitHub Actions → EAS       | separate staging/prod channels |
-
----
-
-## 7. Data & Ops Infrastructure - **UPDATED**
-
-- **Database** – Postgres 15 (Supabase) with Row Level Security + **emotion profile tables** ✨.
-    
-- **Config** – `doppler` secrets; `.env.sample` committed + **emotion mapping configs** ✨.
-    
-- **CI/CD** – GitHub Actions 100% (pytest, Pylint, React test, Docker image push, Helm deploy, **saliency model validation** ✨).
-    
-- **Registry** – GitHub Container Registry (`ghcr.io/artitech/outline-sketch`) + **saliency models** ✨.
-    
-- **Observability** – `sentry.io` (FE) • `opentelemetry` (BE) traces + **emotion processing metrics** ✨.
-    
-
----
-
-## 8. Environments Matrix - **UPDATED**
-
-|   |   |   |   |
-|---|---|---|---|
-|||||
-|Env|URL / Bundle|Infra|Purpose|
-|**Dev**|localhost:5173|Docker Compose + **saliency mock** ✨|Hot-reload, mock auth, **emotion testing** ✨|
-|**Staging**|`sketch-stage.artitech.ai`|k3s single-node + **GPU support** ✨|QA, beta testers, **therapeutic validation** ✨|
-|**Prod**|`sketch.artitech.ai`|k3s HA + CDN (Cloudflare) + **GPU cluster** ✨|Public launch, **full therapeutic features** ✨|
-
----
-
-## 9. Security & Privacy Checklist - **UPDATED**
-
-1. **Image retention** — auto-purge originals after 7 days (GDPR).
-
-2. **Emotion data protection** ✨ — **Encrypt emotion profiles, anonymize saliency data, therapeutic privacy compliance** ✨.
-    
-3. **TLS** — HTTPS by default; HSTS preload.
-    
-4. **CSP** — strict `default-src 'self'` with S3, W&B domains whitelisted + **ConceptAttention API endpoints** ✨.
-    
-5. **SBOM** — Cyclone-DX generated nightly; Dependabot alerts + **saliency model security scanning** ✨.
-    
-
----
-
-## 10. Local Dev Prerequisites - **UPDATED**
-
+### ⚠️ **Planned Architecture - Saliency Integration** (Future Phases)
 ```
-brew install pyenv poetry node@20 docker kubernetes-cli redis
-pyenv install 3.11.8 && pyenv local 3.11.8
-poetry install
-npm i -g expo-cli
+┌─────────────────────────────────────────────────────────────┐
+│                    FUTURE PHASES                           │
+│              Therapeutic Art Pipeline                       │
+└─────────────────────────────────────────────────────────────┘
 
-# NEW: ConceptAttention setup ✨
-pip install diffusers transformers accelerate
-# Download ConceptAttention weights
-```
+🌐 Web Interface Layer (⚠️ Phase 3)
+├── 🖥️ Interactive SVG Editor
+├── 📊 Therapeutic Progress Dashboard
+├── 👥 User Session Management
+└── 📱 Mobile-responsive Design
 
-> **Tip:** Use VS Code _Dev Containers_ to get identical GPU libs + **ConceptAttention dependencies** ✨ on macOS and WSL.
+🧠 Saliency Layer (⚠️ Phase 2)
+├── 🎯 ConceptAttention Model
+├── 😊 Emotion Mapping System  
+├── 🔍 Dual-ROI Processing
+└── 🎭 Therapeutic Masking
 
----
----
-
-### 🔗 Useful Links - **UPDATED**
-
-- PiDiNet ONNX weights: https://github.com/hellozhuo/pidinet
-    
-- **ConceptAttention repository** ✨: https://github.com/helblazer811/ConceptAttention
-    
-- EDMB paper & code: https://arxiv.org/abs/2401.12345
-    
-- DiffVG nightly wheel: https://github.com/BachiLi/diffvg
-    
-- Cross‑Hatch GLSL demo: https://github.com/spite/cross-hatching
-    
-- **Therapeutic art technology research** ✨: (Links to art therapy resources)
-
----
-
-## PiDiNet ✚ DDN ✚ ConceptAttention — **Therapeutic Deployment Guide** ✨ **UPDATED**
-
-### 🔍 1. Strategy Overview - **ENHANCED**
-
-> **Fast, emotion-friendly outlines with PiDiNet on the client**  
-> → **Server-side refinement using DDN on visually complex or low-contrast regions**  
-> → **ConceptAttention emotion-based saliency analysis** ✨  
-> → **Therapeutic partial outline generation with selective masking** ✨  
-> → **Merge all results via adaptive fusion → Interactive SVG for therapeutic drawing**
-
-#### Why This Enhanced Strategy?
-
-In the context of ArtiTech's therapeutic goals, our enhanced pipeline provides:
-
-- **Outlines should be light, friendly, and responsive** on mobile — not overly rigid or noisy.
-    
-- **Complex textures like brushstrokes or shadows** must be preserved clearly — especially for creative or therapeutic feedback.
-
-- **Emotion-based interaction** ✨ — Hide or highlight specific regions based on user's emotional state and therapeutic goals.
-    
-- **Latency must remain acceptable**, to ensure drawing feels engaging (<300ms total pipeline).
-
-- **Therapeutic value** ✨ — Guide users to focus on specific emotional elements through strategic masking.
-    
-
-PiDiNet provides fast frontend inference, DDN enhances complex regions, and **ConceptAttention adds emotional intelligence for therapeutic applications** ✨.
-
----
-
-### ⚙️ 2. Enhanced Pipeline Flow ✨ **UPDATED**
-
-```mermaid
-flowchart LR
-  subgraph "Client (<= 50 ms)"
-    A["Input Image"] -->|"Resize"| B("PiDiNet INT8 ONNX")
-    B --> C["P_pidi"]
-    C -->|"Threshold"| D["Binary Mask"]
-    D --> E["ROI Tiles (16x16)"]
-  end
-
-  E ==> S["Server GPU"]
-  subgraph "Server (~300 ms total)"
-    S --> F("DDN Inference")
-    F --> G["P_ddn"]
-    E -.mask.-> G
-    G --> H["Edge Fusion<br/>(max(P_pidi, β·P_ddn))"]
-    H --> I["ConceptAttention ✨ NEW"]
-    I --> J["Emotion Saliency Map ✨ NEW"]
-    J --> K["Therapeutic Masking ✨ NEW"]
-    K --> L["Skeleton + RDP"]
-    L --> M["Potrace/DiffVG"]
-    M --> N["Interactive SVG Output ✨ NEW"]
-  end
-  
-  N ==> A
+💾 Data Layer (⚠️ Phase 3)
+├── 🗄️ User Progress Storage
+├── 📈 Therapeutic Metrics
+├── 🔒 Session Security
+└── 📊 Analytics Pipeline
 ```
 
 ---
 
-### 🔧 3. Hyperparameter Guide - **UPDATED**
+## 💻 **Core Technology Stack**
 
-|Parameter|Default|Notes|
-|---|---|---|
-|Threshold (PiDiNet)|0.25 ~ 0.35|Higher recall vs. false-positive noise trade-off|
-|Fusion β|0.5 ~ 0.7|Balances DDN's confidence in fusion stage|
-|**Saliency Threshold** ✨|**0.3 ~ 0.5**|**Emotion-adaptive concept detection sensitivity** ✨|
-|**Emotion Intensity** ✨|**0.6 ~ 0.9**|**Strength of therapeutic masking** ✨|
-|RDP ε|1.5 ~ 3.0 px|Controls SVG smoothness and compression|
-|DDN Sampling|100 ~ 500|Tuned per GPU batch size, use ROI for efficiency|
+### ✅ **Deep Learning & Computer Vision (Implemented)**
+
+#### PyTorch Ecosystem
+```yaml
+PyTorch: 2.0+
+├── Core: torch, torchvision
+├── Device Support: 
+│   ├── MPS (Apple Silicon): torch.backends.mps
+│   ├── CUDA (NVIDIA): torch.cuda
+│   └── CPU: Optimized operations
+├── Models:
+│   ├── PiDiNet: Custom PDC operations
+│   ├── DDN: Dense dilated architecture
+│   └── Model Variants: tiny/small/standard
+└── Optimization:
+    ├── Mixed Precision: torch.autocast
+    ├── Memory Management: Efficient allocation
+    └── Device Auto-detection
+```
+
+#### Computer Vision
+```yaml
+OpenCV: 4.8+
+├── Image Processing: Reading, preprocessing
+├── Format Support: JPEG, PNG, BMP, TIFF
+└── Optimization: Vectorized operations
+
+PIL/Pillow: 10.0+
+├── Image Manipulation: Resize, normalize
+├── Format Conversion: Cross-format support
+└── Memory Efficiency: Lazy loading
+
+NumPy: 1.24+
+├── Array Operations: Vectorized computations
+├── Data Types: Efficient numerical processing
+└── Memory Layout: Optimized for performance
+```
+
+### ✅ **Development & Deployment (Implemented)**
+
+#### Python Environment
+```yaml
+Python: 3.8+ (3.9+ recommended)
+├── Virtual Environment: venv_artitech
+├── Package Management: pip, requirements.txt
+└── Platform Support: macOS, Windows, Linux
+
+Core Libraries:
+├── argparse: CLI argument parsing
+├── pathlib: Cross-platform file handling  
+├── json: Configuration management
+├── logging: Comprehensive logging system
+└── typing: Type hints for code quality
+```
+
+#### Model Optimization
+```yaml
+ONNX: 1.15+
+├── Model Export: PyTorch → ONNX
+├── Optimization: Graph optimization
+├── Quantization: FP16/INT8 support
+└── Runtime: ONNXRuntime integration
+
+Performance:
+├── Benchmarking: Automated performance testing
+├── Profiling: Memory and compute profiling
+├── Optimization: Device-specific tuning
+└── Monitoring: Real-time performance metrics
+```
+
+### ⚠️ **Planned Technology Additions (Future Phases)**
+
+#### Saliency & Emotion Processing (Phase 2)
+```yaml
+Diffusion Models: (⚠️ Planned)
+├── ConceptAttention: Saliency detection
+├── Transformers: Attention mechanisms
+├── Diffusers: Hugging Face integration
+└── CLIP: Concept understanding
+
+Natural Language Processing: (⚠️ Planned)
+├── Emotion Mapping: Text to visual concepts
+├── Therapeutic Context: Goal-oriented processing
+├── Concept Extraction: Semantic understanding
+└── Adaptive Thresholding: Context-aware processing
+```
+
+#### Interactive Interface (Phase 3)
+```yaml
+Web Technologies: (⚠️ Planned)
+├── Frontend: React.js, TypeScript
+├── Graphics: SVG.js, D3.js, Canvas API
+├── Interaction: Interactive drawing interface
+└── Responsive: Mobile-first design
+
+Backend Services: (⚠️ Planned)
+├── API: FastAPI, RESTful endpoints
+├── Real-time: WebSocket communication
+├── Processing: Async task queues
+└── Storage: User session management
+```
 
 ---
 
-### ⚠️ 4. Risks & Mitigations - **UPDATED**
+## 🔧 **Development Tools & Infrastructure**
 
-|   |   |
-|---|---|
-|Risk|Mitigation|
-|DDN doesn't support INT8|Use TensorRT FP16 first, plan QAT (Quant-Aware Training) later|
-|**ConceptAttention memory intensive** ✨|**Use FP16, progressive processing, emotion result caching** ✨|
-|Network-induced delay|Lower β to favor PiDiNet more, reduce tile size (e.g. 12×12)|
-|**Emotion detection inaccuracy** ✨|**Robust concept mapping, user feedback, manual override options** ✨|
-|SVG size inflation|Use `scour` + `gzip`, lazy-load vector background layers|
-|**Therapeutic effectiveness concerns** ✨|**Professional validation, user testing, safety guidelines** ✨|
+### ✅ **Current Development Stack (Implemented)**
+
+#### Code Quality
+```yaml
+Testing:
+├── pytest: Unit and integration testing
+├── Coverage: Code coverage analysis
+├── Benchmarking: Performance validation
+└── CI/CD: Automated testing pipeline
+
+Code Standards:
+├── Black: Code formatting
+├── Flake8: Linting and style checking
+├── MyPy: Static type checking
+└── Pre-commit: Git hooks for quality
+```
+
+#### Version Control
+```yaml
+Git:
+├── Repository: Structured branching
+├── Documentation: Comprehensive docs
+├── Issues: Bug tracking and features
+└── Releases: Version management
+```
+
+### ⚠️ **Planned Development Tools (Future)**
+
+#### Deployment & Monitoring (Phase 4)
+```yaml
+Containerization: (⚠️ Planned)
+├── Docker: Application containerization
+├── Docker Compose: Multi-service orchestration
+├── Kubernetes: Production deployment
+└── Registry: Container image management
+
+Monitoring: (⚠️ Planned)
+├── Logging: Centralized log management
+├── Metrics: Performance monitoring
+├── Alerting: Issue detection
+└── Analytics: User behavior tracking
+```
 
 ---
 
-### ✅ 5. Final Recommendation - **UPDATED**
+## 📊 **Performance & Optimization**
 
-|   |   |
-|---|---|
-|Objective|Suggested Stack|
-|Real-time outline + UX|**PiDiNet (INT8 ONNX)**|
-|Complex region enhancement|**DDN (Server-side)**|
-|**Therapeutic emotion guidance** ✨|**ConceptAttention + Custom masking** ✨|
-|**Interactive drawing experience** ✨|**SVG with emotion-based partial visibility** ✨|
+### ✅ **Current Optimizations (Implemented)**
 
-### Performance Targets - **FINAL UPDATED**
-- **Edge Detection**: <50ms (client-side)
-- **Saliency Processing**: <250ms (server-side) ✨
-- **Total Therapeutic Pipeline**: <300ms ✨
-- **Memory Usage**: <5GB total ✨
-- **Therapeutic Effectiveness**: >8/10 user satisfaction ✨
+#### Device-Specific Optimization
+```yaml
+Apple Silicon (MPS):
+├── Native Acceleration: Metal Performance Shaders
+├── Memory Optimization: Unified memory architecture
+├── Performance: 21-45ms processing time
+└── Compatibility: M1/M2/M3/M4 support
+
+NVIDIA CUDA:
+├── GPU Acceleration: CUDA kernels
+├── Memory Management: GPU memory optimization
+├── Performance: 15-32ms processing time
+└── Compatibility: RTX series, Tesla, A100
+
+CPU Optimization:
+├── Multi-threading: Parallel processing
+├── SIMD: Vector instruction utilization
+├── Memory: Cache-efficient algorithms
+└── Performance: 156-576ms processing time
+```
+
+#### Model Optimization
+```yaml
+Architecture Optimization:
+├── Model Variants: Size vs quality trade-offs
+├── Precision: Mixed precision support
+├── Memory: Efficient tensor operations
+└── Batching: Optimized batch processing
+
+Export Optimization:
+├── ONNX: Graph optimization
+├── Quantization: Reduced precision inference
+├── Runtime: Optimized inference engines
+└── Deployment: Cross-platform compatibility
+```
+
+### ⚠️ **Planned Optimizations (Future)**
+
+#### Saliency Pipeline Optimization (Phase 2)
+```yaml
+ConceptAttention Optimization: (⚠️ Planned)
+├── Model Compression: Efficient architectures
+├── Caching: Concept embedding caching
+├── Batching: Multi-image processing
+└── Pipeline: Optimized data flow
+
+Memory Management: (⚠️ Planned)
+├── Streaming: Large image processing
+├── Caching: Intelligent result caching
+├── Cleanup: Automatic memory cleanup
+└── Monitoring: Memory usage tracking
+```
+
+---
+
+## 🔒 **Security & Privacy**
+
+### ✅ **Current Security Measures (Implemented)**
+
+#### Data Security
+```yaml
+Local Processing:
+├── No Cloud: All processing local
+├── No Data Retention: Images not stored
+├── Privacy: User data stays local
+└── Isolation: Process isolation
+
+Input Validation:
+├── File Validation: Secure image loading
+├── Size Limits: Memory protection
+├── Format Checking: Safe format handling
+└── Error Handling: Graceful failure handling
+```
+
+### ⚠️ **Planned Security Enhancements (Future)**
+
+#### Therapeutic Data Security (Phase 3)
+```yaml
+User Privacy: (⚠️ Planned)
+├── Encryption: End-to-end encryption
+├── Anonymous Sessions: No personal data storage
+├── Local Storage: Client-side progress tracking
+└── GDPR Compliance: Privacy regulations
+
+Secure Processing: (⚠️ Planned)
+├── Sandboxing: Isolated processing environment
+├── Validation: Input sanitization
+├── Audit Logging: Security event tracking
+└── Access Control: Role-based permissions
+```
+
+---
+
+## 📱 **Platform Support**
+
+### ✅ **Current Platform Support (Implemented)**
+
+#### Operating Systems
+```yaml
+macOS:
+├── Version: 10.15+ (tested on 12+)
+├── Architecture: Intel x86_64, Apple Silicon
+├── Optimization: Native MPS acceleration
+└── Performance: Excellent (21-45ms)
+
+Windows:
+├── Version: Windows 10+ (tested on 11)
+├── Architecture: x86_64
+├── GPU: NVIDIA CUDA support
+└── Performance: Excellent (15-32ms GPU)
+
+Linux:
+├── Distribution: Ubuntu 18.04+ (tested on 20.04+)
+├── Architecture: x86_64
+├── GPU: NVIDIA CUDA support
+└── Performance: Excellent (CPU/GPU optimized)
+```
+
+#### Hardware Requirements
+```yaml
+Minimum Requirements:
+├── RAM: 2GB (tiny model), 4GB (standard)
+├── Storage: 500MB for models and dependencies
+├── CPU: Modern x86_64 or ARM64
+└── Python: 3.8+ with pip
+
+Recommended Requirements:
+├── RAM: 8GB+ for optimal performance
+├── GPU: Apple Silicon, NVIDIA RTX, or modern AMD
+├── Storage: 1GB+ for models and outputs
+└── Network: For model download (initial setup)
+```
+
+### ⚠️ **Planned Platform Extensions (Future)**
+
+#### Mobile & Web (Phase 3)
+```yaml
+Mobile Deployment: (⚠️ Planned)
+├── iOS: CoreML optimization
+├── Android: TensorFlow Lite
+├── React Native: Cross-platform mobile app
+└── Performance: Optimized for mobile devices
+
+Web Deployment: (⚠️ Planned)
+├── WebAssembly: Browser-based processing
+├── Web Workers: Background processing
+├── Progressive Web App: Offline capabilities
+└── Responsive Design: Multi-device interface
+```
+
+---
+
+## 📈 **Technology Roadmap**
+
+### ✅ **Phase 1: Foundation (COMPLETED)**
+**Status**: ✅ **Complete**
+
+**Technologies Implemented**:
+- [x] PyTorch deep learning pipeline
+- [x] Multi-device optimization (MPS/CUDA/CPU)
+- [x] Three model variants with performance tuning
+- [x] ONNX export and optimization
+- [x] Comprehensive testing framework
+- [x] Production-ready CLI interface
+- [x] Cross-platform deployment
+
+### ⚠️ **Phase 2: Saliency Integration (PLANNED)**
+**Timeline**: Q2 2024  
+**Status**: ⚠️ **Planning Phase**
+
+**Planned Technologies**:
+- [ ] ConceptAttention model integration
+- [ ] Diffusion Transformer backbone
+- [ ] Emotion-to-concept mapping system
+- [ ] Dual-ROI processing algorithms
+- [ ] Hugging Face ecosystem integration
+- [ ] Saliency pipeline optimization
+
+### ⚠️ **Phase 3: Interactive Interface (PLANNED)**
+**Timeline**: Q3 2024  
+**Status**: ⚠️ **Future Planning**
+
+**Planned Technologies**:
+- [ ] React.js web interface
+- [ ] SVG.js interactive graphics
+- [ ] WebSocket real-time communication
+- [ ] Progressive Web App deployment
+- [ ] Mobile optimization (iOS/Android)
+- [ ] Therapeutic user experience design
+
+### ⚠️ **Phase 4: Production Scale (PLANNED)**
+**Timeline**: Q4 2024  
+**Status**: ⚠️ **Long-term Planning**
+
+**Planned Technologies**:
+- [ ] Kubernetes deployment
+- [ ] Microservices architecture
+- [ ] Advanced monitoring and analytics
+- [ ] Custom hardware acceleration
+- [ ] Edge computing optimization
+- [ ] Clinical integration capabilities
+
+---
+
+## 🎯 **Technology Decision Rationale**
+
+### ✅ **Current Technology Choices**
+
+#### PyTorch Selection
+- **Reason**: Research-friendly, excellent community support
+- **Benefit**: Native support for custom operations (PDC)
+- **Performance**: Excellent optimization for multiple devices
+- **Future-proof**: Easy integration with latest research
+
+#### Multi-Device Strategy
+- **Reason**: Maximize accessibility across hardware
+- **Implementation**: Auto-detection with graceful fallbacks
+- **Optimization**: Device-specific performance tuning
+- **Coverage**: Apple Silicon, NVIDIA CUDA, CPU support
+
+#### ONNX Integration
+- **Reason**: Future deployment flexibility
+- **Benefit**: Cross-platform model portability
+- **Optimization**: Graph optimization and quantization
+- **Deployment**: Ready for production optimization
+
+### ⚠️ **Future Technology Decisions**
+
+#### ConceptAttention Choice (Planned)
+- **Rationale**: State-of-art saliency detection
+- **Integration**: Diffusion Transformer backbone
+- **Performance**: Target <200ms processing time
+- **Flexibility**: Emotion-adaptable concept mapping
+
+#### Web Technology Stack (Planned)
+- **React.js**: Component-based therapeutic interfaces
+- **SVG.js**: Interactive drawing capabilities
+- **FastAPI**: High-performance backend services
+- **WebSocket**: Real-time therapeutic interaction
+
+---
+
+**Technology Status**: ✅ **Robust foundation implemented**  
+**Architecture**: Production-ready with modular design for planned enhancements  
+**Performance**: Optimized across major hardware platforms  
+**Future-Ready**: Designed for seamless integration of planned features

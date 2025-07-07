@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-07-07 20:30:23",
+  "image_shape": [
+    4000,
+    3092,
+    3
+  ],
+  "quality_metrics": {
+    "enhancement_ratio": 1.3712769425973017,
+    "strong_edge_ratio": 1.0,
+    "roi_coverage": 0.3181190168175938,
+    "roi_enhancement": 1.7937531783955647,
+    "base_mean_intensity": 27.693870067917207,
+    "enhanced_mean_intensity": 37.97596547542044,
+    "base_strong_edges": 1343207,
+    "enhanced_strong_edges": 1343207
+  },
+  "processing_stats": {
+    "semantic_extraction_time": 1.6136398315429688,
+    "density_extraction_time": 47.49739217758179,
+    "merge_time": 0.0439610481262207,
+    "total_processing_time": 49.16581916809082,
+    "num_semantic_rois": 2,
+    "num_density_rois": 2,
+    "num_merged_rois": 3,
+    "total_tiles": 58
+  },
+  "roi_summary": {
+    "num_semantic_rois": 2,
+    "num_density_rois": 2,
+    "num_merged_rois": 3,
+    "total_tiles": 58
+  }
+}

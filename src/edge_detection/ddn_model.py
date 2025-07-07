@@ -30,6 +30,15 @@ except ImportError as e:
     print(f"❌ DDN import failed: {e}")
     raise
 
+# Import ROI processor for enhanced functionality
+try:
+    from .saliency.roi_processor import DualROIProcessor, ROIRegion
+
+    ROI_PROCESSING_AVAILABLE = True
+except ImportError:
+    print("⚠️ ROI processor not available, using standard tile processing only")
+    ROI_PROCESSING_AVAILABLE = False
+
 
 class DDNConfig:
     """DDN 모델 설정 클래스"""
@@ -371,6 +380,401 @@ class DDNModel:
             "std_time_ms": float(np.std(times)),
             "total_inferences": len(times),
         }
+
+    # ===== ROI-SPECIFIC ENHANCEMENT METHODS =====
+
+    def inference_roi_tiles(
+        self, image: np.ndarray, roi_tiles: List[Dict], batch_size: int = 4
+    ) -> Dict[str, np.ndarray]:
+        """
+        ROI-specific tile processing for enhanced edge detection
+
+        Args:
+            image: Original image (H, W, 3)
+            roi_tiles: List of ROI tile dictionaries from DualROIProcessor
+            batch_size: Number of tiles to process in each batch
+
+        Returns:
+            Dictionary mapping tile IDs to enhanced edge maps
+        """
+        if not ROI_PROCESSING_AVAILABLE:
+            raise RuntimeError("ROI processing not available. Install saliency module.")
+
+        start_time = time.time()
+
+        print(f"🎯 Processing {len(roi_tiles)} ROI tiles with DDN enhancement...")
+
+        tile_results = {}
+        processed_tiles = []
+        tile_metadata = []
+
+        # Extract tiles from image
+        for i, tile_info in enumerate(roi_tiles):
+            x1, y1, x2, y2 = tile_info["bbox"]
+
+            # Extract tile from image
+            tile_image = image[y1:y2, x1:x2].copy()
+
+            # Resize to model's expected tile size if needed
+            if tile_image.shape[:2] != (self.tile_size, self.tile_size):
+                tile_image = cv2.resize(tile_image, (self.tile_size, self.tile_size))
+
+            processed_tiles.append(tile_image)
+            tile_metadata.append(
+                {
+                    "id": f"roi_tile_{i}",
+                    "bbox": tile_info["bbox"],
+                    "roi_coverage": tile_info["roi_coverage"],
+                    "original_size": (x2 - x1, y2 - y1),
+                    "roi_region": tile_info.get("roi_region", None),
+                }
+            )
+
+        # Batch inference on ROI tiles
+        edge_maps = self.inference_batch(processed_tiles, batch_size=batch_size)
+
+        # Process results with ROI-specific enhancements
+        for i, (edge_map, metadata) in enumerate(zip(edge_maps, tile_metadata)):
+            # Apply ROI-specific enhancement based on ROI type and coverage
+            enhanced_edge_map = self._enhance_roi_edges(
+                edge_map, metadata["roi_coverage"], metadata.get("roi_region", None)
+            )
+
+            # Resize back to original tile size if needed
+            if metadata["original_size"] != (self.tile_size, self.tile_size):
+                target_h, target_w = metadata["original_size"]
+                enhanced_edge_map = cv2.resize(enhanced_edge_map, (target_w, target_h))
+
+            tile_results[metadata["id"]] = {
+                "edge_map": enhanced_edge_map,
+                "metadata": metadata,
+                "enhancement_applied": True,
+            }
+
+        processing_time = time.time() - start_time
+
+        print(
+            f"✅ ROI tile processing complete: {len(tile_results)} tiles in {processing_time:.3f}s"
+        )
+
+        return tile_results
+
+    def _enhance_roi_edges(
+        self,
+        edge_map: np.ndarray,
+        roi_coverage: float,
+        roi_region: Optional["ROIRegion"] = None,
+    ) -> np.ndarray:
+        """
+        Apply ROI-specific enhancements to edge maps
+
+        Args:
+            edge_map: Base edge map from DDN (H, W) [0, 255]
+            roi_coverage: Percentage of tile covered by ROI [0, 1]
+            roi_region: ROI region metadata for context-aware enhancement
+
+        Returns:
+            Enhanced edge map (H, W) [0, 255]
+        """
+        enhanced = edge_map.copy().astype(np.float32)
+
+        # ROI coverage-based enhancement
+        if roi_coverage > 0.7:
+            # High ROI coverage: Strong enhancement
+            enhancement_factor = 1.3
+            contrast_boost = 1.2
+        elif roi_coverage > 0.3:
+            # Medium ROI coverage: Moderate enhancement
+            enhancement_factor = 1.15
+            contrast_boost = 1.1
+        else:
+            # Low ROI coverage: Minimal enhancement
+            enhancement_factor = 1.05
+            contrast_boost = 1.02
+
+        # Apply enhancement
+        enhanced = enhanced * enhancement_factor
+
+        # ROI type-specific enhancements
+        if roi_region and hasattr(roi_region, "roi_type"):
+            if roi_region.roi_type == "semantic":
+                # Semantic ROI: Emphasize strong edges, smooth weak ones
+                strong_edges = enhanced > 128
+                enhanced[strong_edges] = np.minimum(enhanced[strong_edges] * 1.2, 255)
+                enhanced[~strong_edges] = enhanced[~strong_edges] * 0.9
+
+            elif roi_region.roi_type == "density":
+                # Density ROI: Preserve fine details
+                enhanced = self._preserve_fine_details(enhanced)
+
+            elif roi_region.roi_type == "merged":
+                # Merged ROI: Balanced enhancement
+                enhanced = self._balanced_enhancement(enhanced, roi_region.confidence)
+
+        # Contrast adjustment
+        enhanced = self._adjust_contrast(enhanced, contrast_boost)
+
+        # Ensure valid range
+        enhanced = np.clip(enhanced, 0, 255).astype(np.uint8)
+
+        return enhanced
+
+    def _preserve_fine_details(self, edge_map: np.ndarray) -> np.ndarray:
+        """Preserve fine details in density ROIs"""
+        # Apply gentle Gaussian blur to reduce noise while preserving details
+        blurred = cv2.GaussianBlur(edge_map, (3, 3), 0.5)
+
+        # Combine original and blurred using weighted average
+        preserved = 0.7 * edge_map + 0.3 * blurred
+
+        return preserved
+
+    def _balanced_enhancement(
+        self, edge_map: np.ndarray, confidence: float
+    ) -> np.ndarray:
+        """Apply balanced enhancement for merged ROIs"""
+        # Confidence-based enhancement strength
+        strength = 0.9 + (confidence * 0.3)  # Range: 0.9 to 1.2
+
+        # Apply adaptive histogram equalization for better contrast
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4))
+        enhanced = clahe.apply(edge_map.astype(np.uint8)).astype(np.float32)
+
+        # Apply confidence-based scaling
+        enhanced = enhanced * strength
+
+        return enhanced
+
+    def _adjust_contrast(
+        self, edge_map: np.ndarray, contrast_factor: float
+    ) -> np.ndarray:
+        """Adjust contrast of edge map"""
+        # Apply contrast adjustment using power function
+        normalized = edge_map / 255.0
+        adjusted = np.power(normalized, 1.0 / contrast_factor)
+        return adjusted * 255.0
+
+    def reconstruct_from_roi_tiles(
+        self,
+        tile_results: Dict[str, np.ndarray],
+        image_shape: Tuple[int, int],
+        blending_mode: str = "weighted",
+    ) -> np.ndarray:
+        """
+        Reconstruct full edge map from ROI tile results
+
+        Args:
+            tile_results: Results from inference_roi_tiles
+            image_shape: (height, width) of target image
+            blending_mode: Tile blending strategy ('weighted', 'max', 'average')
+
+        Returns:
+            Reconstructed edge map (H, W) [0, 255]
+        """
+        height, width = image_shape
+        reconstruction = np.zeros((height, width), dtype=np.float32)
+        weight_map = np.zeros((height, width), dtype=np.float32)
+
+        print(f"🔄 Reconstructing full edge map from {len(tile_results)} ROI tiles...")
+
+        for tile_id, tile_data in tile_results.items():
+            edge_map = tile_data["edge_map"]
+            metadata = tile_data["metadata"]
+            x1, y1, x2, y2 = metadata["bbox"]
+
+            # Calculate expected tile dimensions
+            expected_height = y2 - y1
+            expected_width = x2 - x1
+
+            # Ensure edge_map matches expected dimensions
+            if edge_map.shape != (expected_height, expected_width):
+                # Resize edge_map to match expected tile size
+                edge_map = cv2.resize(edge_map, (expected_width, expected_height))
+
+            # Calculate blending weights based on ROI coverage
+            roi_coverage = metadata["roi_coverage"]
+            base_weight = 0.5 + (roi_coverage * 0.5)  # Range: 0.5 to 1.0
+
+            if blending_mode == "weighted":
+                # Distance-based weight tapering from tile center
+                tile_h, tile_w = edge_map.shape
+                center_y, center_x = tile_h // 2, tile_w // 2
+
+                y_coords, x_coords = np.ogrid[:tile_h, :tile_w]
+                distance_from_center = np.sqrt(
+                    (x_coords - center_x) ** 2 + (y_coords - center_y) ** 2
+                )
+                max_distance = np.sqrt(center_x**2 + center_y**2)
+
+                # Create weight mask: stronger at center, weaker at edges
+                weight_mask = base_weight * (
+                    1.0 - (distance_from_center / max_distance) * 0.5
+                )
+                weight_mask = np.clip(weight_mask, 0.1, 1.0)
+
+            elif blending_mode == "max":
+                weight_mask = np.ones_like(edge_map) * base_weight
+
+            else:  # average
+                weight_mask = np.ones_like(edge_map) * base_weight
+
+            # Apply weighted blending
+            reconstruction[y1:y2, x1:x2] += edge_map.astype(np.float32) * weight_mask
+            weight_map[y1:y2, x1:x2] += weight_mask
+
+        # Normalize by weight map to handle overlapping regions
+        valid_regions = weight_map > 0
+        reconstruction[valid_regions] /= weight_map[valid_regions]
+
+        # Fill empty regions with zero or interpolation
+        empty_regions = weight_map == 0
+        if np.any(empty_regions):
+            print(f"⚠️ Filling {np.sum(empty_regions)} empty pixels with interpolation")
+            # Simple nearest neighbor interpolation for empty regions
+            from scipy.ndimage import binary_dilation
+
+            # Expand valid regions slightly and use for interpolation
+            expanded_valid = binary_dilation(valid_regions, iterations=3)
+            if np.any(expanded_valid & empty_regions):
+                # Use nearest valid value for empty pixels
+                from scipy.ndimage import distance_transform_edt
+
+                indices = distance_transform_edt(empty_regions, return_indices=True)[1]
+                # Fix the indexing issue - handle 2D indices properly
+                y_indices, x_indices = indices
+                reconstruction[empty_regions] = reconstruction[
+                    y_indices[empty_regions], x_indices[empty_regions]
+                ]
+
+        result = np.clip(reconstruction, 0, 255).astype(np.uint8)
+
+        print(f"✅ Reconstruction complete: {image_shape} edge map")
+
+        return result
+
+    def process_image_with_roi_enhancement(
+        self, image: np.ndarray, saliency_map: np.ndarray, base_edge_map: np.ndarray
+    ) -> Dict[str, Any]:
+        """
+        Complete ROI-enhanced edge detection pipeline
+
+        Args:
+            image: Input image (H, W, 3)
+            saliency_map: Saliency map from ConceptAttention (H, W) [0, 1]
+            base_edge_map: Base edge map from PiDiNet (H, W) [0, 255]
+
+        Returns:
+            Dictionary with enhanced edge maps and processing metadata
+        """
+        if not ROI_PROCESSING_AVAILABLE:
+            print("⚠️ ROI processing not available, returning base edge map")
+            return {
+                "enhanced_edge_map": base_edge_map,
+                "base_edge_map": base_edge_map,
+                "roi_processing_applied": False,
+            }
+
+        start_time = time.time()
+
+        print(f"🚀 Starting ROI-enhanced DDN processing...")
+
+        # Initialize ROI processor
+        roi_processor = DualROIProcessor()
+
+        # Process dual ROI
+        roi_result = roi_processor.process_dual_roi(saliency_map, base_edge_map / 255.0)
+
+        # Get all ROI tiles
+        all_tiles = []
+        for roi_tiles in roi_result["roi_tiles"].values():
+            all_tiles.extend(roi_tiles)
+
+        if not all_tiles:
+            print("⚠️ No ROI tiles found, returning base edge map")
+            return {
+                "enhanced_edge_map": base_edge_map,
+                "base_edge_map": base_edge_map,
+                "roi_processing_applied": False,
+                "roi_result": roi_result,
+            }
+
+        # Process ROI tiles with DDN enhancement
+        tile_results = self.inference_roi_tiles(image, all_tiles)
+
+        # Reconstruct enhanced edge map
+        enhanced_edge_map = self.reconstruct_from_roi_tiles(
+            tile_results, image.shape[:2], blending_mode="weighted"
+        )
+
+        # Combine with base edge map for full coverage
+        final_edge_map = self._combine_enhanced_with_base(
+            enhanced_edge_map, base_edge_map, roi_result["merged_rois"]
+        )
+
+        total_time = time.time() - start_time
+
+        result = {
+            "enhanced_edge_map": final_edge_map,
+            "base_edge_map": base_edge_map,
+            "roi_enhanced_map": enhanced_edge_map,
+            "roi_processing_applied": True,
+            "roi_result": roi_result,
+            "tile_results": tile_results,
+            "processing_stats": {
+                "total_time": total_time,
+                "num_roi_tiles": len(all_tiles),
+                "num_merged_rois": len(roi_result["merged_rois"]),
+                **self.get_performance_stats(),
+            },
+        }
+
+        print(f"🎉 ROI-enhanced processing complete in {total_time:.3f}s")
+
+        return result
+
+    def _combine_enhanced_with_base(
+        self,
+        enhanced_map: np.ndarray,
+        base_map: np.ndarray,
+        roi_regions: List["ROIRegion"],
+    ) -> np.ndarray:
+        """
+        Combine ROI-enhanced regions with base edge map
+
+        Args:
+            enhanced_map: ROI-enhanced edge map
+            base_map: Base edge map
+            roi_regions: List of ROI regions for blending
+
+        Returns:
+            Combined edge map
+        """
+        result = base_map.copy().astype(np.float32)
+        enhanced = enhanced_map.astype(np.float32)
+
+        # Create blending mask from ROI regions
+        blend_mask = np.zeros(base_map.shape, dtype=np.float32)
+
+        for roi in roi_regions:
+            # Use ROI mask for blending
+            roi_mask = roi.mask.astype(np.float32)
+
+            # Smooth the mask edges for seamless blending
+            roi_mask = cv2.GaussianBlur(roi_mask, (5, 5), 1.0)
+
+            # Weight by ROI confidence
+            weighted_mask = roi_mask * roi.confidence
+
+            blend_mask = np.maximum(blend_mask, weighted_mask)
+
+        # Ensure blend mask is in [0, 1] range
+        if np.max(blend_mask) > 0:
+            blend_mask = np.clip(blend_mask, 0, 1)
+
+        # Blend enhanced and base maps
+        result = (1.0 - blend_mask) * result + blend_mask * enhanced
+
+        return np.clip(result, 0, 255).astype(np.uint8)
 
 
 # 테스트 함수

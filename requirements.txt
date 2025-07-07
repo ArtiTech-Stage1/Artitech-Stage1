@@ -22,6 +22,14 @@ timm==0.4.12  # DDN dependency: Vision Transformer library
 imageio>=2.31.0  # DDN dependency: Image I/O
 matplotlib>=3.7.0  # DDN dependency: Visualization and plotting
 
+# ConceptAttention for Phase 2 Saliency Integration
+# Option 1: Full ConceptAttention package (recommended)
+# -e git+https://github.com/helblazer811/ConceptAttention.git#egg=concept_attention
+
+# Option 2: Minimal dependencies (fallback when full package not available)
+diffusers>=0.25.0  # Required for Flux pipeline (both full and minimal)
+transformers>=4.36.0  # Required for text processing (both full and minimal)
+
 # CLI and Utilities
 click>=8.0.0
 typer>=0.9.0
