@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+httpx
+python-dotenv
+google-genai
+asyncpg
+pyjwt[crypto]
+email-validator
