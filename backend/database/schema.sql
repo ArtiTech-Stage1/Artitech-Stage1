@@ -154,5 +154,134 @@ FROM users u
 LEFT JOIN user_preferences up ON u.id = up.user_id
 GROUP BY u.id;
 
--- INSERT INTO users (clerk_user_id, email, username, first_name, last_name) 
+-- INSERT INTO users (clerk_user_id, email, username, first_name, last_name)
 -- VALUES ('clerk_test_123', 'test@example.com', 'testuser', 'Test', 'User');
+
+-- ========================================
+-- 艺术品数据库表结构
+-- ========================================
+
+-- 启用向量扩展（如果使用pgvector）
+-- CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 艺术品主表
+CREATE TABLE artworks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    object_id VARCHAR(50) UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    object_name VARCHAR(255),
+    department VARCHAR(255),
+    culture VARCHAR(255),
+    period VARCHAR(255),
+    artist_display_name TEXT,
+    medium TEXT,
+    dimensions TEXT,
+    classification VARCHAR(255),
+    object_date VARCHAR(255),
+    general_text_description TEXT,
+    url TEXT,
+
+    -- 向量嵌入字段（如果使用pgvector）
+    -- title_vector VECTOR(384),
+    -- description_vector VECTOR(384),
+    -- combined_vector VECTOR(384),
+
+    -- 标签字段
+    color_tags TEXT[],
+    style_tags TEXT[],
+    theme_tags TEXT[],
+    emotion_tags TEXT[],
+
+    -- 评分字段
+    popularity_score DECIMAL(5,2) DEFAULT 0.0,
+    quality_score DECIMAL(5,2) DEFAULT 0.0,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 艺术品嵌入向量表（用于存储不同类型的向量）
+CREATE TABLE artwork_embeddings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    artwork_id UUID NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
+    embedding_type VARCHAR(50) NOT NULL, -- 'title', 'description', 'combined'
+    embedding_vector TEXT NOT NULL, -- JSON格式存储向量
+    model_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 用户与艺术品交互记录表
+CREATE TABLE artwork_user_interactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    artwork_id UUID NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
+    interaction_type VARCHAR(50) NOT NULL, -- 'view', 'like', 'dislike', 'save', 'share'
+    interaction_score DECIMAL(3,2) DEFAULT 1.0,
+    context JSONB, -- 交互时的上下文信息
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(user_id, artwork_id, interaction_type)
+);
+
+-- 艺术品相似度表
+CREATE TABLE artwork_similarity (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    artwork_id_1 UUID NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
+    artwork_id_2 UUID NOT NULL REFERENCES artworks(id) ON DELETE CASCADE,
+    similarity_score DECIMAL(5,4) NOT NULL,
+    similarity_type VARCHAR(50) NOT NULL, -- 'visual', 'semantic', 'style', 'theme'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(artwork_id_1, artwork_id_2, similarity_type)
+);
+
+-- 艺术品推荐缓存表
+CREATE TABLE artwork_recommendation_cache (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    cache_key VARCHAR(255) NOT NULL, -- 基于用户偏好和查询生成的缓存键
+    artwork_ids JSONB NOT NULL, -- 推荐的艺术品ID列表
+    scores JSONB NOT NULL, -- 对应的评分列表
+    query_context JSONB, -- 查询上下文
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(user_id, cache_key)
+);
+
+-- 创建索引
+CREATE INDEX idx_artworks_object_id ON artworks(object_id);
+CREATE INDEX idx_artworks_title ON artworks USING gin(to_tsvector('english', title));
+CREATE INDEX idx_artworks_description ON artworks USING gin(to_tsvector('english', general_text_description));
+CREATE INDEX idx_artworks_artist ON artworks(artist_display_name);
+CREATE INDEX idx_artworks_culture ON artworks(culture);
+CREATE INDEX idx_artworks_period ON artworks(period);
+CREATE INDEX idx_artworks_department ON artworks(department);
+CREATE INDEX idx_artworks_classification ON artworks(classification);
+CREATE INDEX idx_artworks_color_tags ON artworks USING gin(color_tags);
+CREATE INDEX idx_artworks_style_tags ON artworks USING gin(style_tags);
+CREATE INDEX idx_artworks_theme_tags ON artworks USING gin(theme_tags);
+CREATE INDEX idx_artworks_emotion_tags ON artworks USING gin(emotion_tags);
+CREATE INDEX idx_artworks_popularity_score ON artworks(popularity_score DESC);
+CREATE INDEX idx_artworks_quality_score ON artworks(quality_score DESC);
+
+CREATE INDEX idx_artwork_embeddings_artwork_id ON artwork_embeddings(artwork_id);
+CREATE INDEX idx_artwork_embeddings_type ON artwork_embeddings(embedding_type);
+
+CREATE INDEX idx_artwork_interactions_user_id ON artwork_user_interactions(user_id);
+CREATE INDEX idx_artwork_interactions_artwork_id ON artwork_user_interactions(artwork_id);
+CREATE INDEX idx_artwork_interactions_type ON artwork_user_interactions(interaction_type);
+CREATE INDEX idx_artwork_interactions_created_at ON artwork_user_interactions(created_at);
+
+CREATE INDEX idx_artwork_similarity_artwork1 ON artwork_similarity(artwork_id_1);
+CREATE INDEX idx_artwork_similarity_artwork2 ON artwork_similarity(artwork_id_2);
+CREATE INDEX idx_artwork_similarity_score ON artwork_similarity(similarity_score DESC);
+CREATE INDEX idx_artwork_similarity_type ON artwork_similarity(similarity_type);
+
+CREATE INDEX idx_recommendation_cache_user_id ON artwork_recommendation_cache(user_id);
+CREATE INDEX idx_recommendation_cache_key ON artwork_recommendation_cache(cache_key);
+CREATE INDEX idx_recommendation_cache_expires ON artwork_recommendation_cache(expires_at);
+
+-- 添加触发器
+CREATE TRIGGER update_artworks_updated_at BEFORE UPDATE ON artworks
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

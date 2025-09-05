@@ -7,3 +7,11 @@ google-genai
 asyncpg
 pyjwt[crypto]
 email-validator
+
+# 艺术品检索系统依赖
+sentence-transformers
+pandas
+numpy
+scikit-learn
+torch
+transformers

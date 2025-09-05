@@ -20,7 +20,7 @@ from .models import (
     UserResponse, UserStatsResponse
 )
 
-from .repository import UserRepository
+from .user_repository import UserRepository
 from .chat_repository import ChatRepository, RecommendationRepository
 from .service import UserService
 from .auth import ClerkAuth, get_current_user, get_optional_user, clerk_auth

@@ -7,7 +7,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
 from database.config import DatabaseManager
-from .repository import UserRepository
+from .user_repository import UserRepository
 from .chat_repository import ChatRepository, RecommendationRepository
 from .models import (
     User, UserResponse, UserStatsResponse, CreateUserRequest, UpdateUserRequest,
@@ -126,8 +126,8 @@ class UserService:
         LIMIT 1
         """
         
-        async with self.db.get_connection() as conn:
-            # 获取情绪统计
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            # 获取情绪统计
             mood_rows = await conn.fetch(mood_query, user_id)
             favorite_moods = [row['mood'] for row in mood_rows]
             
@@ -224,7 +224,8 @@ class UserService:
         """
         
         import json
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             await conn.execute(
                 query,
                 user_id,

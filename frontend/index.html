@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>艺术品推荐系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 700px;
+            width: 90%;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .main-question {
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 30px;
+            font-weight: 300;
+            transition: all 0.3s ease;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 40px;
+            transition: all 0.3s ease;
+        }
+
+        .input-container {
+            margin-bottom: 30px;
+        }
+
+        .user-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.3s ease;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .user-input:focus {
+            border-color: #667eea;
+        }
+
+        /* 聊天界面样式 */
+        .chat-container {
+            display: none;
+            text-align: left;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .chat-message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+
+        .user-message {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .ai-message {
+            background: #e9ecef;
+            color: #333;
+            margin-right: auto;
+        }
+
+        .message-time {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .response-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .ai-response {
+            font-size: 1.1em;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .recommendations-container {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .artwork-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            text-align: left;
+        }
+
+        .artwork-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .artwork-artist {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .artwork-details {
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        /* 页面状态样式 */
+        .page-initial {
+            /* 初始状态 */
+        }
+
+        .page-chatting {
+            /* 聊天状态 */
+        }
+
+        .page-recommending {
+            /* 推荐状态 */
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .emotion-indicator {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 15px;
+            font-size: 0.9em;
+            margin: 5px;
+        }
+
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 0.9em;
+        }
+
+        .back-btn:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainContainer">
+        <!-- 初始页面 -->
+        <div id="initialPage" class="page-initial">
+            <h1 class="main-question">How do you feel today?</h1>
+            <p class="subtitle">告诉我你今天的感受，我会为你推荐合适的艺术品</p>
+
+            <div class="input-container">
+                <textarea
+                    class="user-input"
+                    id="userInput"
+                    placeholder="请描述你今天的心情、感受或想法..."
+                    rows="4"
+                ></textarea>
+            </div>
+
+            <button class="submit-btn" id="submitBtn" onclick="submitMessage()">
+                分享我的感受
+            </button>
+        </div>
+
+        <!-- 聊天页面 -->
+        <div id="chatPage" class="page-chatting hidden">
+            <h2>让我们聊聊你的感受</h2>
+            <div class="chat-container" id="chatContainer"></div>
+
+            <div class="input-container">
+                <textarea
+                    class="user-input"
+                    id="chatInput"
+                    placeholder="继续分享你的感受..."
+                    rows="3"
+                ></textarea>
+            </div>
+
+            <button class="back-btn" onclick="goBack()">重新开始</button>
+            <button class="submit-btn" id="chatSubmitBtn" onclick="submitChatMessage()">
+                发送
+            </button>
+        </div>
+
+        <!-- 推荐页面 -->
+        <div id="recommendPage" class="page-recommending hidden">
+            <h2>为你推荐的艺术品</h2>
+            <div id="emotionSummary" class="emotion-summary"></div>
+            <div class="recommendations-container">
+                <div id="artworksList"></div>
+            </div>
+            <button class="back-btn" onclick="goBack()">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api';
+        let userId = 'user_' + Math.random().toString(36).substr(2, 9);
+        let chatHistory = [];
+        let currentUserProfile = {};
+
+        // 页面状态管理
+        const PageState = {
+            INITIAL: 'initial',
+            CHATTING: 'chatting',
+            RECOMMENDING: 'recommending'
+        };
+
+        let currentState = PageState.INITIAL;
+
+        function switchToPage(state) {
+            // 隐藏所有页面
+            document.getElementById('initialPage').classList.add('hidden');
+            document.getElementById('chatPage').classList.add('hidden');
+            document.getElementById('recommendPage').classList.add('hidden');
+
+            // 显示目标页面
+            switch(state) {
+                case PageState.INITIAL:
+                    document.getElementById('initialPage').classList.remove('hidden');
+                    break;
+                case PageState.CHATTING:
+                    document.getElementById('chatPage').classList.remove('hidden');
+                    break;
+                case PageState.RECOMMENDING:
+                    document.getElementById('recommendPage').classList.remove('hidden');
+                    break;
+            }
+
+            currentState = state;
+        }
+
+        function addChatMessage(message, isUser = false) {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user-message' : 'ai-message'}`;
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+
+            messageDiv.innerHTML = `
+                <div>${message}</div>
+                <div class="message-time">${timeStr}</div>
+            `;
+
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function submitMessage() {
+            const userInput = document.getElementById('userInput').value.trim();
+            if (!userInput) {
+                alert('请输入你的感受');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '分析中...';
+
+            try {
+                const result = await sendChatMessage(userInput);
+
+                if (result.recommendation_triggered) {
+                    // 直接跳转到推荐页面
+                    await showRecommendations(result);
+                } else {
+                    // 切换到聊天页面继续对话
+                    switchToPage(PageState.CHATTING);
+                    addChatMessage(userInput, true);
+                    addChatMessage(result.ai_response, false);
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('抱歉，服务暂时不可用，请稍后再试。');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '分享我的感受';
+            }
+        }
+
+        async function submitChatMessage() {
+            const chatInput = document.getElementById('chatInput');
+            const userInput = chatInput.value.trim();
+            if (!userInput) {
+                alert('请输入你的感受');
+                return;
+            }
+
+            const submitBtn = document.getElementById('chatSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '发送中...';
+
+            // 添加用户消息到聊天界面
+            addChatMessage(userInput, true);
+            chatInput.value = '';
+
+            try {
+                const result = await sendChatMessage(userInput);
+
+                // 添加AI回复
+                addChatMessage(result.ai_response, false);
+
+                if (result.recommendation_triggered) {
+                    // 延迟一下再跳转到推荐页面
+                    setTimeout(async () => {
+                        await showRecommendations(result);
+                    }, 1000);
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                addChatMessage('抱歉，服务暂时不可用，请稍后再试。', false);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '发送';
+            }
+        }
+
+        async function sendChatMessage(message) {
+            const response = await fetch(`${API_BASE_URL}/chat/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    message: message
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('网络请求失败');
+            }
+
+            const data = await response.json();
+            currentUserProfile = data.user_profile;
+            chatHistory.push({
+                user_message: message,
+                ai_response: data.ai_response,
+                extracted_elements: data.extracted_elements
+            });
+
+            return data;
+        }
+
+        async function showRecommendations(chatResult) {
+            try {
+                const recommendResponse = await fetch(`${API_BASE_URL}/recommend/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        extracted_elements: chatResult.extracted_elements,
+                        user_profile: chatResult.user_profile
+                    })
+                });
+
+                if (recommendResponse.ok) {
+                    const recommendations = await recommendResponse.json();
+                    displayRecommendations(recommendations, chatResult.extracted_elements);
+                    switchToPage(PageState.RECOMMENDING);
+                } else {
+                    throw new Error('推荐服务失败');
+                }
+
+            } catch (error) {
+                console.error('Recommendation error:', error);
+                alert('获取推荐失败，请重试');
+            }
+        }
+
+        function displayRecommendations(artworks, extractedElements) {
+            const artworksList = document.getElementById('artworksList');
+            const emotionSummary = document.getElementById('emotionSummary');
+
+            // 显示情感总结
+            let summaryHtml = '<h3>基于你的感受：</h3>';
+            if (extractedElements.mood) {
+                summaryHtml += `<span class="emotion-indicator">情绪: ${extractedElements.mood}</span>`;
+            }
+            if (extractedElements.colors && extractedElements.colors.length > 0) {
+                summaryHtml += `<span class="emotion-indicator">色彩偏好: ${extractedElements.colors.join(', ')}</span>`;
+            }
+            if (extractedElements.themes && extractedElements.themes.length > 0) {
+                summaryHtml += `<span class="emotion-indicator">主题偏好: ${extractedElements.themes.join(', ')}</span>`;
+            }
+            emotionSummary.innerHTML = summaryHtml;
+
+            // 显示推荐艺术品
+            if (artworks && artworks.length > 0) {
+                artworksList.innerHTML = '';
+                artworks.forEach((artwork, index) => {
+                    const artworkCard = document.createElement('div');
+                    artworkCard.className = 'artwork-card fade-in';
+                    artworkCard.style.animationDelay = `${index * 0.1}s`;
+                    artworkCard.innerHTML = `
+                        <div class="artwork-title">${artwork.title}</div>
+                        <div class="artwork-artist">艺术家：${artwork.artist}</div>
+                        <div class="artwork-details">
+                            风格：${artwork.style} |
+                            主题：${artwork.theme} |
+                            色彩：${artwork.colors.join(', ')}
+                        </div>
+                    `;
+                    artworksList.appendChild(artworkCard);
+                });
+            } else {
+                artworksList.innerHTML = '<p>暂时没有找到合适的推荐，请尝试描述更多感受。</p>';
+            }
+        }
+
+        function goBack() {
+            // 重置状态
+            chatHistory = [];
+            currentUserProfile = {};
+            document.getElementById('userInput').value = '';
+            document.getElementById('chatInput').value = '';
+            document.getElementById('chatContainer').innerHTML = '';
+
+            // 回到初始页面
+            switchToPage(PageState.INITIAL);
+        }
+
+        // 事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 允许按Enter键提交
+            document.getElementById('userInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitMessage();
+                }
+            });
+
+            document.getElementById('chatInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitChatMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

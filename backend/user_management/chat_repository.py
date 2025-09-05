@@ -28,8 +28,8 @@ class ChatRepository:
         VALUES ($1, $2)
         RETURNING id, user_id, session_name, started_at, ended_at, is_active, total_messages
         """
-        
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:
             row = await conn.fetchrow(query, user_id, session_data.session_name)
             
             if row:
@@ -54,7 +54,8 @@ class ChatRepository:
         WHERE id = $1
         """
         
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:
             row = await conn.fetchrow(query, session_id)
             
             if row:
@@ -85,7 +86,8 @@ class ChatRepository:
         LIMIT $2
         """
         
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             rows = await conn.fetch(query, user_id, limit)
             
             sessions = []
@@ -112,7 +114,8 @@ class ChatRepository:
         LIMIT 1
         """
         
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             row = await conn.fetchrow(query, user_id)
             
             if row:
@@ -136,7 +139,8 @@ class ChatRepository:
         WHERE id = $2
         """
         
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             result = await conn.execute(query, datetime.now(), session_id)
             return result == "UPDATE 1"
     
@@ -156,7 +160,8 @@ class ChatRepository:
         RETURNING id, session_id, user_id, message_type, content, extracted_elements, recommendation_triggered, created_at
         """
         
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             async with conn.transaction():
                 # 更新会话计数
                 await conn.execute(update_session_query, message_data.session_id)
@@ -196,7 +201,8 @@ class ChatRepository:
         LIMIT $2
         """
         
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             rows = await conn.fetch(query, session_id, limit)
             
             messages = []
@@ -225,7 +231,8 @@ class ChatRepository:
         LIMIT $2
         """
         
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             rows = await conn.fetch(query, user_id, limit)
             
             messages = []
@@ -256,7 +263,8 @@ class RecommendationRepository:
         RETURNING id, user_id, session_id, message_id, artwork_ids, recommendation_context, user_feedback, created_at
         """
 
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             row = await conn.fetchrow(
                 query,
                 user_id,
@@ -289,7 +297,8 @@ class RecommendationRepository:
         WHERE id = $2
         """
 
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             result = await conn.execute(query, feedback, recommendation_id)
             return result == "UPDATE 1"
 
@@ -303,7 +312,8 @@ class RecommendationRepository:
         LIMIT $2
         """
 
-        async with self.db.get_connection() as conn:
+        conn_ctx = await self.db.get_connection()
+        async with conn_ctx as conn:            
             rows = await conn.fetch(query, user_id, limit)
 
             recommendations = []

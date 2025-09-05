@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>艺术品推荐系统 - API测试</h1>
+    
+    <div class="test-section">
+        <h2>后端连接测试</h2>
+        <button class="test-button" onclick="testBackendConnection()">测试后端连接</button>
+        <div id="connectionResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>聊天API测试</h2>
+        <input type="text" id="userId" placeholder="用户ID (可选，留空自动生成)" />
+        <textarea id="testMessage" placeholder="输入测试消息..." rows="3"></textarea>
+        <button class="test-button" onclick="testChatAPI()">测试聊天API</button>
+        <div id="chatResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>推荐API测试</h2>
+        <button class="test-button" onclick="testRecommendAPI()">测试推荐API</button>
+        <div id="recommendResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>预设测试场景</h2>
+        <button class="test-button" onclick="testScenario('happy')">测试开心情绪</button>
+        <button class="test-button" onclick="testScenario('sad')">测试悲伤情绪</button>
+        <button class="test-button" onclick="testScenario('vague')">测试模糊表达</button>
+        <button class="test-button" onclick="testScenario('colors')">测试颜色偏好</button>
+        <div id="scenarioResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        let testUserId = 'test_user_' + Math.random().toString(36).substr(2, 9);
+
+        async function testBackendConnection() {
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.textContent = '正在测试连接...';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `✅ 连接成功！\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `❌ 连接失败: ${response.status}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `❌ 连接错误: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testChatAPI() {
+            const resultDiv = document.getElementById('chatResult');
+            const userId = document.getElementById('userId').value || testUserId;
+            const message = document.getElementById('testMessage').value;
+            
+            if (!message.trim()) {
+                alert('请输入测试消息');
+                return;
+            }
+            
+            resultDiv.textContent = '正在测试聊天API...';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/chat/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        message: message
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `✅ 聊天API测试成功！\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `❌ 聊天API测试失败: ${response.status}\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `❌ 聊天API错误: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testRecommendAPI() {
+            const resultDiv = document.getElementById('recommendResult');
+            resultDiv.textContent = '正在测试推荐API...';
+            
+            // 模拟推荐请求数据
+            const testData = {
+                user_id: testUserId,
+                extracted_elements: {
+                    mood: "happy",
+                    emotion_intensity: "medium",
+                    colors: ["blue", "yellow"],
+                    themes: ["nature"],
+                    styles: [],
+                    is_recommendation_query: true
+                },
+                user_profile: {
+                    mood: "happy",
+                    preferences: {
+                        colors: ["blue"],
+                        themes: ["nature"],
+                        styles: []
+                    }
+                }
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/recommend/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = `✅ 推荐API测试成功！\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `❌ 推荐API测试失败: ${response.status}\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `❌ 推荐API错误: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testScenario(scenario) {
+            const resultDiv = document.getElementById('scenarioResult');
+            
+            const scenarios = {
+                'happy': '我今天非常开心！阳光明媚，心情特别好！',
+                'sad': '我今天很难过，感觉很沮丧...',
+                'vague': '嗯，还好吧',
+                'colors': '我喜欢蓝色和黄色的艺术品'
+            };
+            
+            const message = scenarios[scenario];
+            resultDiv.textContent = `正在测试场景: ${scenario}\n消息: ${message}\n\n`;
+            
+            try {
+                // 先测试聊天
+                const chatResponse = await fetch(`${API_BASE_URL}/api/chat/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: testUserId + '_' + scenario,
+                        message: message
+                    })
+                });
+                
+                const chatData = await chatResponse.json();
+                
+                if (chatResponse.ok) {
+                    resultDiv.textContent += `✅ 聊天响应:\n${JSON.stringify(chatData, null, 2)}\n\n`;
+                    
+                    // 如果触发推荐，测试推荐API
+                    if (chatData.recommendation_triggered) {
+                        const recommendResponse = await fetch(`${API_BASE_URL}/api/recommend/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                user_id: chatData.user_id,
+                                extracted_elements: chatData.extracted_elements,
+                                user_profile: chatData.user_profile
+                            })
+                        });
+                        
+                        const recommendData = await recommendResponse.json();
+                        
+                        if (recommendResponse.ok) {
+                            resultDiv.textContent += `✅ 推荐结果:\n${JSON.stringify(recommendData, null, 2)}`;
+                            resultDiv.className = 'result success';
+                        } else {
+                            resultDiv.textContent += `❌ 推荐失败: ${recommendResponse.status}`;
+                            resultDiv.className = 'result error';
+                        }
+                    } else {
+                        resultDiv.textContent += '💬 需要继续对话，未触发推荐';
+                        resultDiv.className = 'result success';
+                    }
+                } else {
+                    resultDiv.textContent += `❌ 聊天失败: ${chatResponse.status}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent += `❌ 测试错误: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+    </script>
+</body>
+</html>
